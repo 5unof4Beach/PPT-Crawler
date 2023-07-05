@@ -1,0 +1,24 @@
+{
+  "name": "ppt-crawler",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/5unof4Beach/PPT-Crawler.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/5unof4Beach/PPT-Crawler/issues"
+  },
+  "homepage": "https://github.com/5unof4Beach/PPT-Crawler#readme",
+  "dependencies": {
+    "ts-node": "^10.9.1",
+    "typescript": "^5.1.6"
+  }
+}
