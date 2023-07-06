@@ -9,12 +9,12 @@ const linkList: string[] = [];
 const dlinkList: string[] = [];
 
 const getAllLink = async () => {
-  // let i = 0;
+  let i = 0;
   let nextPage =
-    "https://24slides.com/templates/paginate/featured?page=2&offset=12";
+    "https://24slides.com/templates/paginate/featured?page=1&offset=0";
   do {
     try {
-      // i = i + 1;
+      i = i + 1;
       console.log(`Retriving data from ${nextPage}`);
       const response = await axios.get(nextPage);
       const { html, pagination_next_page_url } = response.data;
@@ -23,7 +23,7 @@ const getAllLink = async () => {
     } catch (e) {
       break;
     }
-  } while (true);
+  } while (i < 1);
 };
 
 const retrieveSlideLinkFromHtml = async (html: string) => {
@@ -38,7 +38,10 @@ const retrieveSlideLinkFromHtml = async (html: string) => {
 };
 
 const scrapeAllSlideDownloadLink = async (slideLinks: string[]) => {
-  const browser = await puppeteer.launch({ headless: false });
+  const browser = await puppeteer.launch({
+    headless: false,
+    userDataDir: "./user-data-dir",
+  });
   const page = await browser.newPage();
   await page.goto(baseURL);
   await page.setViewport({ width: 1200, height: 800 });
@@ -56,19 +59,28 @@ const scrapeAllSlideDownloadLink = async (slideLinks: string[]) => {
   ]);
 
   for (let i = 0; i < slideLinks.length; i++) {
-    const url = slideLinks[i];
-    await page.goto(url, {
-      waitUntil: "domcontentloaded",
-    });
-    const content = await page.content();
     try {
+      const url = slideLinks[i];
+      await page
+        .goto(url, {
+          waitUntil: "domcontentloaded",
+        })
+        .catch((e) => {
+          console.log(`${dlinkList.length} download links retrieved`);
+          throw e;
+        });
+      const content = await page.content();
       const $ = cheerio.load(content);
       const downloadLink = $("a.btn-download").attr("href") ?? "";
-      console.log("Download link retrieved " + downloadLink);
+      console.log(
+        `Download link retrieved ${downloadLink} | total: ${
+          dlinkList.length + 1
+        }`
+      );
       dlinkList.push(downloadLink);
     } catch (error) {
-      console.error(`${dlinkList.length} download links retrieved`);
       console.error(error);
+      continue;
     }
   }
 
