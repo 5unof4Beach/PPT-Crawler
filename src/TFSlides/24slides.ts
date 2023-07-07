@@ -31,7 +31,7 @@ const getAllLink = async () => {
     } catch (e) {
       break;
     }
-  } while (i < 1);
+  } while (true);
 };
 
 const retrieveSlideLinkFromHtml = async (html: string) => {
@@ -140,7 +140,7 @@ const exportCSV = (templates: template[]) => {
   //Write data
   templates.forEach((template: template) => {
     const { category, name, templateUrl, downloadUrl } = template;
-    writeStream.write(`${category},${name},${templateUrl},${downloadUrl}\n`);
+    writeStream.write(`${category.replace(/\,/g, '')},${name.replace(/\,/g, '')},${templateUrl},${downloadUrl}\n`);
   });
 
   writeStream.on("finish", () => {
