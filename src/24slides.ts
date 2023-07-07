@@ -1,8 +1,8 @@
 require("dotenv").config();
 import axios from "axios";
 import * as cheerio from "cheerio";
-import puppeteer from "puppeteer";
-const fs = require("fs");
+import puppeteer, { Page } from "puppeteer";
+import * as fs from "fs";
 
 const baseURL = "https://24slides.com/templates/featured";
 const linkList: string[] = [];
@@ -39,20 +39,7 @@ const retrieveSlideLinkFromHtml = async (html: string) => {
 
 const scrapeAllSlideDownloadLink = async (slideLinks: string[]) => {
   let { page, browser } = await initiateNewBrowser();
-  await page.goto(baseURL);
-  await page.setViewport({ width: 1200, height: 800 });
-  await page.waitForSelector(".openLoginCard");
-  await page.click(".openLoginCard");
-  const $email = await page.waitForSelector("#loginEmail");
-  const $password = await page.waitForSelector("#loginPassword");
-  const $loginBtn = await page.waitForSelector(".login-btn");
-
-  await $email?.type(process.env.TF_SLIDE_EMAIL ?? "");
-  await $password?.type(process.env.TF_SLIDE_PASSWORD ?? "");
-  await Promise.all([
-    $loginBtn?.click(),
-    page.waitForNavigation({ waitUntil: "networkidle0" }),
-  ]);
+  await login(page);
 
   for (let i = 0; i < slideLinks.length; i++) {
     try {
@@ -73,45 +60,82 @@ const scrapeAllSlideDownloadLink = async (slideLinks: string[]) => {
           dlinkList.length + 1
         }`
       );
-      dlinkList.push(downloadLink);
+      if (downloadLink) {
+        dlinkList.push(downloadLink);
+      } else {
+        --i;
+      }
     } catch (error) {
-      console.error(error);
-      i--;
+      console.log(
+        "---------------------- Request timeout creating new browser ----------------------"
+      );
       browser.disconnect();
-      const NB = await initiateNewBrowser();
-      page = NB.page;
-      browser = NB.browser;
-      await page.goto(baseURL);
-      await page.setViewport({ width: 1200, height: 800 });
-      await page.waitForSelector(".openLoginCard");
-      await page.click(".openLoginCard");
-      const $email = await page.waitForSelector("#loginEmail");
-      const $password = await page.waitForSelector("#loginPassword");
-      const $loginBtn = await page.waitForSelector(".login-btn");
-
-      await $email?.type(process.env.TF_SLIDE_EMAIL ?? "");
-      await $password?.type(process.env.TF_SLIDE_PASSWORD ?? "");
-      await Promise.all([
-        $loginBtn?.click(),
-        page.waitForNavigation({ waitUntil: "networkidle0" }),
-      ]);
+      const newBrowser = await initiateNewBrowser();
+      page = newBrowser.page;
+      browser = newBrowser.browser;
+      await login(page);
+      --i;
     }
   }
-
   await browser.close();
 };
 
 const initiateNewBrowser = async () => {
   const browser = await puppeteer.launch({
-    headless: false,
+    headless: true,
   });
   const page = await browser.newPage();
   return { page, browser };
+};
+
+const login = async (page: Page) => {
+  let successful = false;
+  do {
+    console.log("----------------------- Loggin in -----------------------");
+    await page.goto(baseURL);
+    await page.setViewport({ width: 1200, height: 800 });
+    await page.waitForSelector(".openLoginCard");
+    await page.click(".openLoginCard");
+    const $email = await page.waitForSelector("#loginEmail");
+    const $password = await page.waitForSelector("#loginPassword");
+    const $loginBtn = await page.waitForSelector(".login-btn");
+
+    await $email?.type(process.env.TF_SLIDE_EMAIL ?? "");
+    await $password?.type(process.env.TF_SLIDE_PASSWORD ?? "");
+    await Promise.all([
+      $loginBtn?.click(),
+      page.waitForNavigation({ waitUntil: "networkidle0" }),
+    ]);
+    console.log("Checking");
+    const link = await page.$(".openLoginCard");
+    successful = link ? false : true;
+  } while (!successful);
+};
+
+const writeDownloadLinksToFile = (links: string[]) => {
+  const writeStream = fs.createWriteStream("Download-Links.txt");
+  const pathName = writeStream.path;
+
+  // write each value of the array on the file breaking line
+  links.forEach((link: string) => writeStream.write(`${link}\n`));
+
+  // the finish event is emitted when all data has been flushed from the stream
+  writeStream.on("finish", () => {
+    console.log(`wrote all the array data to file ${pathName}`);
+  });
+
+  // handle the errors on the write process
+  writeStream.on("error", (err) => {
+    console.error(`There is an error writing the file ${pathName} => ${err}`);
+  });
+
+  // close the stream
+  writeStream.end();
 };
 
 (async () => {
   await getAllLink();
   await scrapeAllSlideDownloadLink(linkList);
   console.log(dlinkList, `Total: ${dlinkList.length}`);
-  // await downloadFiles(dlinkList)
+  writeDownloadLinksToFile(dlinkList);
 })();
