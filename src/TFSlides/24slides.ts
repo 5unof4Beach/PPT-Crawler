@@ -4,11 +4,19 @@ import * as cheerio from "cheerio";
 import puppeteer, { Page } from "puppeteer";
 import * as fs from "fs";
 
+type template = {
+  category: string;
+  name: string;
+  templateUrl: string;
+  downloadUrl: string;
+};
+
 const baseURL = "https://24slides.com/templates/featured";
 const linkList: string[] = [];
-const dlinkList: string[] = [];
+const dlinkList: template[] = [];
 
 const getAllLink = async () => {
+  //Get all template data from main page
   let i = 0;
   let nextPage =
     "https://24slides.com/templates/paginate/featured?page=1&offset=0";
@@ -23,7 +31,7 @@ const getAllLink = async () => {
     } catch (e) {
       break;
     }
-  } while (true);
+  } while (i < 1);
 };
 
 const retrieveSlideLinkFromHtml = async (html: string) => {
@@ -49,23 +57,33 @@ const scrapeAllSlideDownloadLink = async (slideLinks: string[]) => {
           waitUntil: "domcontentloaded",
         })
         .catch((e) => {
+          //throw error case of timeout
           console.log(`${dlinkList.length} download links retrieved`);
           throw e;
         });
       const content = await page.content();
       const $ = cheerio.load(content);
       const downloadLink = $("a.btn-download").attr("href") ?? "";
+      const category =
+        $("ol.breadcrumb-menu > li:nth-child(2) span").text() ?? "";
+      const name = $("ol.breadcrumb-menu > li:nth-child(3) span").text() ?? "";
       console.log(
         `Download link retrieved ${downloadLink} | total: ${
           dlinkList.length + 1
         }`
       );
       if (downloadLink) {
-        dlinkList.push(downloadLink);
+        dlinkList.push({
+          category,
+          name,
+          templateUrl: slideLinks[i],
+          downloadUrl: downloadLink,
+        });
       } else {
         --i;
       }
     } catch (error) {
+      // Create new browser after current browser got blocked
       console.log(
         "---------------------- Request timeout creating new browser ----------------------"
       );
@@ -91,6 +109,7 @@ const initiateNewBrowser = async () => {
 const login = async (page: Page) => {
   let successful = false;
   do {
+    // Retry login if login button still exists
     console.log("----------------------- Loggin in -----------------------");
     await page.goto(baseURL);
     await page.setViewport({ width: 1200, height: 800 });
@@ -106,30 +125,49 @@ const login = async (page: Page) => {
       $loginBtn?.click(),
       page.waitForNavigation({ waitUntil: "networkidle0" }),
     ]);
-    console.log("Checking");
+    console.log("Checking if login is successful");
     const link = await page.$(".openLoginCard");
     successful = link ? false : true;
   } while (!successful);
 };
 
-const writeDownloadLinksToFile = (links: string[]) => {
-  const writeStream = fs.createWriteStream("Download-Links.txt");
+const exportCSV = (templates: template[]) => {
+  const writeStream = fs.createWriteStream("crawled-data.csv");
   const pathName = writeStream.path;
 
-  // write each value of the array on the file breaking line
-  links.forEach((link: string) => writeStream.write(`${link}\n`));
+  //Generate header
+  writeStream.write(`category,name,templateUrl,downloadUrl\n`);
+  //Write data
+  templates.forEach((template: template) => {
+    const { category, name, templateUrl, downloadUrl } = template;
+    writeStream.write(`${category},${name},${templateUrl},${downloadUrl}\n`);
+  });
 
-  // the finish event is emitted when all data has been flushed from the stream
   writeStream.on("finish", () => {
     console.log(`wrote all the array data to file ${pathName}`);
   });
 
-  // handle the errors on the write process
   writeStream.on("error", (err) => {
     console.error(`There is an error writing the file ${pathName} => ${err}`);
   });
 
-  // close the stream
+  writeStream.end();
+};
+
+const exportJSON = (templates: template[]) => {
+  const writeStream = fs.createWriteStream("crawled-data.json");
+  const pathName = writeStream.path;
+
+  writeStream.write(JSON.stringify(templates));
+
+  writeStream.on("finish", () => {
+    console.log(`wrote all the array data to file ${pathName}`);
+  });
+
+  writeStream.on("error", (err) => {
+    console.error(`There is an error writing the file ${pathName} => ${err}`);
+  });
+
   writeStream.end();
 };
 
@@ -137,5 +175,6 @@ const writeDownloadLinksToFile = (links: string[]) => {
   await getAllLink();
   await scrapeAllSlideDownloadLink(linkList);
   console.log(dlinkList, `Total: ${dlinkList.length}`);
-  writeDownloadLinksToFile(dlinkList);
+  exportCSV(dlinkList);
+  exportJSON(dlinkList);
 })();

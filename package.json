@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "ts-node src/24slides.ts"
+    "start": "ts-node src/TFSlides/24slides.ts"
   },
   "repository": {
     "type": "git",
