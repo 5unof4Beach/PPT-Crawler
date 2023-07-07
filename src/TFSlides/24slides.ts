@@ -1,17 +1,10 @@
-require("dotenv").config();
+import { template } from "./types";
+import { login, initiateNewBrowser } from "./utils";
 import axios from "axios";
 import * as cheerio from "cheerio";
-import puppeteer, { Page } from "puppeteer";
 import * as fs from "fs";
+import { downloadAll } from "./download";
 
-type template = {
-  category: string;
-  name: string;
-  templateUrl: string;
-  downloadUrl: string;
-};
-
-const baseURL = "https://24slides.com/templates/featured";
 const linkList: string[] = [];
 const dlinkList: template[] = [];
 
@@ -46,10 +39,11 @@ const retrieveSlideLinkFromHtml = async (html: string) => {
 };
 
 const scrapeAllSlideDownloadLink = async (slideLinks: string[]) => {
+  const total = slideLinks.length;
   let { page, browser } = await initiateNewBrowser();
   await login(page);
 
-  for (let i = 0; i < slideLinks.length; i++) {
+  for (let i = 0; i < total; i++) {
     try {
       const url = slideLinks[i];
       await page
@@ -70,12 +64,12 @@ const scrapeAllSlideDownloadLink = async (slideLinks: string[]) => {
       console.log(
         `Download link retrieved ${downloadLink} | total: ${
           dlinkList.length + 1
-        }`
+        }/${total}`
       );
       if (downloadLink) {
         dlinkList.push({
           category,
-          name,
+          name: name.replace(/[`~!@#$%^&*()_|+\-=?;:'",.<>\{\}\[\]\\\/]/gi, ""),
           templateUrl: slideLinks[i],
           downloadUrl: downloadLink,
         });
@@ -98,39 +92,6 @@ const scrapeAllSlideDownloadLink = async (slideLinks: string[]) => {
   await browser.close();
 };
 
-const initiateNewBrowser = async () => {
-  const browser = await puppeteer.launch({
-    headless: true,
-  });
-  const page = await browser.newPage();
-  return { page, browser };
-};
-
-const login = async (page: Page) => {
-  let successful = false;
-  do {
-    // Retry login if login button still exists
-    console.log("----------------------- Loggin in -----------------------");
-    await page.goto(baseURL);
-    await page.setViewport({ width: 1200, height: 800 });
-    await page.waitForSelector(".openLoginCard");
-    await page.click(".openLoginCard");
-    const $email = await page.waitForSelector("#loginEmail");
-    const $password = await page.waitForSelector("#loginPassword");
-    const $loginBtn = await page.waitForSelector(".login-btn");
-
-    await $email?.type(process.env.TF_SLIDE_EMAIL ?? "");
-    await $password?.type(process.env.TF_SLIDE_PASSWORD ?? "");
-    await Promise.all([
-      $loginBtn?.click(),
-      page.waitForNavigation({ waitUntil: "networkidle0" }),
-    ]);
-    console.log("Checking if login is successful");
-    const link = await page.$(".openLoginCard");
-    successful = link ? false : true;
-  } while (!successful);
-};
-
 const exportCSV = (templates: template[]) => {
   const writeStream = fs.createWriteStream("crawled-data.csv");
   const pathName = writeStream.path;
@@ -140,7 +101,12 @@ const exportCSV = (templates: template[]) => {
   //Write data
   templates.forEach((template: template) => {
     const { category, name, templateUrl, downloadUrl } = template;
-    writeStream.write(`${category.replace(/\,/g, '')},${name.replace(/\,/g, '')},${templateUrl},${downloadUrl}\n`);
+    writeStream.write(
+      `${category.replace(/\,/g, "")},${name.replace(
+        /\,/g,
+        ""
+      )},${templateUrl},${downloadUrl}\n`
+    );
   });
 
   writeStream.on("finish", () => {
@@ -171,10 +137,10 @@ const exportJSON = (templates: template[]) => {
   writeStream.end();
 };
 
-(async () => {
+export const scrapeTemplates = async () => {
   await getAllLink();
   await scrapeAllSlideDownloadLink(linkList);
-  console.log(dlinkList, `Total: ${dlinkList.length}`);
+  console.log(`Download links scraping done, total: ${dlinkList.length}`);
   exportCSV(dlinkList);
   exportJSON(dlinkList);
-})();
+};
