@@ -23,7 +23,7 @@ const getAllLink = async () => {
     } catch (e) {
       break;
     }
-  } while (i < 1);
+  } while (true);
 };
 
 const retrieveSlideLinkFromHtml = async (html: string) => {
@@ -38,11 +38,7 @@ const retrieveSlideLinkFromHtml = async (html: string) => {
 };
 
 const scrapeAllSlideDownloadLink = async (slideLinks: string[]) => {
-  const browser = await puppeteer.launch({
-    headless: false,
-    userDataDir: "./user-data-dir",
-  });
-  const page = await browser.newPage();
+  let { page, browser } = await initiateNewBrowser();
   await page.goto(baseURL);
   await page.setViewport({ width: 1200, height: 800 });
   await page.waitForSelector(".openLoginCard");
@@ -80,11 +76,37 @@ const scrapeAllSlideDownloadLink = async (slideLinks: string[]) => {
       dlinkList.push(downloadLink);
     } catch (error) {
       console.error(error);
-      continue;
+      i--;
+      browser.disconnect();
+      const NB = await initiateNewBrowser();
+      page = NB.page;
+      browser = NB.browser;
+      await page.goto(baseURL);
+      await page.setViewport({ width: 1200, height: 800 });
+      await page.waitForSelector(".openLoginCard");
+      await page.click(".openLoginCard");
+      const $email = await page.waitForSelector("#loginEmail");
+      const $password = await page.waitForSelector("#loginPassword");
+      const $loginBtn = await page.waitForSelector(".login-btn");
+
+      await $email?.type(process.env.TF_SLIDE_EMAIL ?? "");
+      await $password?.type(process.env.TF_SLIDE_PASSWORD ?? "");
+      await Promise.all([
+        $loginBtn?.click(),
+        page.waitForNavigation({ waitUntil: "networkidle0" }),
+      ]);
     }
   }
 
   await browser.close();
+};
+
+const initiateNewBrowser = async () => {
+  const browser = await puppeteer.launch({
+    headless: false,
+  });
+  const page = await browser.newPage();
+  return { page, browser };
 };
 
 (async () => {
