@@ -1,5 +1,5 @@
-import { template } from "./types";
-import { login, initiateNewBrowser } from "./utils";
+import { template } from "../types";
+import { login, initiateNewBrowser } from "../utils";
 import axios from "axios";
 import * as cheerio from "cheerio";
 import * as fs from "fs";

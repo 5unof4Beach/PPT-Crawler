@@ -6,7 +6,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "ts-node src/TFSlides/main.ts",
-    "download": "ts-node src/TFSlides/download.ts"
+    "start-sc": "ts-node src/SlidesCarnival/scrapeData.ts",
+    "download": "ts-node src/TFSlides/download.ts",
+    "download-sc": "ts-node src/SlidesCarnival/download.ts"
   },
   "repository": {
     "type": "git",

@@ -1,6 +1,6 @@
 /node_modules
 /user-data-dir
-/Downloads
+/Downloads*
 *.txt
 *.json
 *.csv

@@ -2,11 +2,11 @@ import { template } from "../types";
 import * as fs from "fs";
 import { login, initiateNewBrowser } from "../utils";
 import { Page } from "puppeteer";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import path from "path";
 
 let downloaded = 0;
-const rawTemplates: template[] = require("../../crawled-data.json");
+const rawTemplates: template[] = require("../../crawled-data-sc.json");
 // Remove duplicate data
 const templates = [
   ...new Map(rawTemplates.map((item) => [item["name"], item])).values(),
@@ -20,40 +20,32 @@ const firstHalf = templates.splice(0, middleIndex);
 const secondHalf = templates.splice(-middleIndex);
 
 export const download = async (data: template[]) => {
-  let { page, browser } = await initiateNewBrowser();
-  await login(page);
-  let cookie = await getToken(page);
-
   for (let i = 0; i < data.length; i++) {
     const templateData: template = data[i];
     try {
-      await req(templateData, cookie);
-    } catch (error) {
-      console.log(error);
-      browser.disconnect();
-      const newBrowser = await initiateNewBrowser();
-      page = newBrowser.page;
-      browser = newBrowser.browser;
-      await login(page);
-      cookie = await getToken(page);
-      await req(templateData, cookie);
+      await req(templateData);
+    } catch (error: AxiosError | any) {
+      console.log(error, templateData.templateUrl);
+      if (axios.isAxiosError(error)) {
+        // Access to config, request, and response
+        if (error.response?.status != 404) await req(templateData);
+      } else {
+        // Just a stock error
+      }
     }
   }
   return;
 };
 
-const req = async (templateData: template, cookie: any) => {
+const req = async (templateData: template) => {
   return axios
     .get(templateData.downloadUrl, {
-      headers: {
-        Cookie: `${cookie.name}=${cookie.value};`,
-      },
       responseType: "stream",
     })
     .then((response) => {
       save(
         response,
-        `Downloads/${templateData.category}`,
+        `Downloads-sc/${templateData.category}`,
         `${templateData.name}.pptx`
       )
         .then(() => {
@@ -92,7 +84,7 @@ const save = async (response: any, location: string, name: string) => {
 
 export const downloadAll = async () => {
   await Promise.all([download(firstHalf), download(secondHalf)]);
-  console.log(downloaded,"All templates downloaded");
+  console.log(downloaded, "All templates downloaded");
 };
 
 downloadAll();
