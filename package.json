@@ -7,6 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "ts-node src/TFSlides/main.ts",
     "start-sc": "ts-node src/SlidesCarnival/scrapeData.ts",
+    "start-sg": "ts-node src/Slidesgo/scrapeData.ts",
     "download": "ts-node src/TFSlides/download.ts",
     "download-sc": "ts-node src/SlidesCarnival/download.ts"
   },
